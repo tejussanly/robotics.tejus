@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Digital Lock System — Arduino Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   TOKENS & RESET
+══════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:        #06080d;
+  --bg2:       #0a0e18;
+  --bg3:       #0f1525;
+  --card:      rgba(255,255,255,0.032);
+  --card-h:    rgba(255,255,255,0.06);
+  --border:    rgba(255,255,255,0.07);
+  --border-g:  rgba(99,210,255,0.25);
+
+  --cyan:      #63d2ff;
+  --cyan-dim:  rgba(99,210,255,0.12);
+  --green:     #43e97b;
+  --green-dim: rgba(67,233,123,0.1);
+  --red:       #ff5c5c;
+  --red-dim:   rgba(255,92,92,0.1);
+  --amber:     #ffc843;
+
+  --text:      #dde6f0;
+  --muted:     #5a6a80;
+  --subtle:    #8a9ab0;
+
+  --f-head: 'Outfit', sans-serif;
+  --f-mono: 'JetBrains Mono', monospace;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--f-head);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+::selection { background: rgba(99,210,255,0.2); color: #fff; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+/* ══════════════════════════════════════════
+   ANIMATED BG GRID
+══════════════════════════════════════════ */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(99,210,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,210,255,0.025) 1px, transparent 1px);
+  background-size: 52px 52px;
+  animation: gridMove 25s linear infinite;
+}
+@keyframes gridMove {
+  to { background-position: 52px 52px; }
+}
+
+/* glow orbs */
+.orb { position:fixed; border-radius:50%; filter:blur(110px); pointer-events:none; z-index:0; }
+.orb-1 { width:500px; height:500px; top:-180px; left:-120px;
+  background: radial-gradient(circle, rgba(99,210,255,.08), transparent 70%); }
+.orb-2 { width:450px; height:450px; bottom:-100px; right:-100px;
+  background: radial-gradient(circle, rgba(67,233,123,.06), transparent 70%); }
+.orb-3 { width:350px; height:350px; top:45%; left:45%;
+  background: radial-gradient(circle, rgba(255,92,92,.04), transparent 70%); }
+
+/* ══════════════════════════════════════════
+   NAV
+══════════════════════════════════════════ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2.5rem; height: 62px;
+  background: rgba(6,8,13,.85);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-brand {
+  font-size: 1rem; font-weight: 700; letter-spacing: -.01em;
+  display: flex; align-items: center; gap: .6rem;
+}
+.lock-icon-sm {
+  width: 28px; height: 28px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.lock-icon-sm svg { width: 18px; height: 18px; }
+.nav-pill {
+  font-family: var(--f-mono); font-size: .62rem; letter-spacing: .12em;
+  text-transform: uppercase; padding: .22rem .65rem;
+  background: var(--cyan-dim); color: var(--cyan);
+  border: 1px solid rgba(99,210,255,.2); border-radius: 2px;
+}
+.nav-links {
+  display: flex; gap: .2rem; list-style: none;
+}
+.nav-links a {
+  font-family: var(--f-mono); font-size: .65rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+  text-decoration: none; padding: .4rem .8rem;
+  border-radius: 4px; transition: color .15s, background .15s;
+}
+.nav-links a:hover { color: var(--cyan); background: var(--cyan-dim); }
+.sim-btn {
+  font-family: var(--f-mono); font-size: .65rem; letter-spacing: .1em;
+  text-transform: uppercase; padding: .45rem 1.1rem;
+  background: var(--cyan); color: var(--bg); font-weight: 500;
+  text-decoration: none; border-radius: 4px; transition: opacity .15s;
+  white-space: nowrap;
+}
+.sim-btn:hover { opacity: .85; }
+
+/* ══════════════════════════════════════════
+   HERO
+══════════════════════════════════════════ */
+.hero {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 7rem 2rem 4rem;
+  text-align: center;
+}
+.hero-eyebrow {
+  font-family: var(--f-mono); font-size: .7rem; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--cyan);
+  display: flex; align-items: center; gap: .6rem;
+  margin-bottom: 1.8rem;
+}
+.hero-eyebrow::before, .hero-eyebrow::after {
+  content:''; width:32px; height:1px; background: var(--cyan); opacity:.4;
+}
+
+/* animated lock graphic */
+.hero-lock {
+  position: relative; margin: 0 auto 2.5rem;
+  width: 120px; height: 120px;
+}
+.lock-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(99,210,255,.15);
+  animation: spinRing 12s linear infinite;
+}
+.lock-ring:nth-child(2) {
+  inset: 10px;
+  border-color: rgba(99,210,255,.1);
+  animation-direction: reverse;
+  animation-duration: 8s;
+}
+@keyframes spinRing {
+  to { transform: rotate(360deg); }
+}
+.lock-ring::after {
+  content: '';
+  position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+}
+.lock-core {
+  position: absolute; inset: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--border-g);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.lock-core svg { width: 36px; height: 36px; }
+.lock-glow {
+  position: absolute; inset: -20px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,210,255,.12), transparent 70%);
+  animation: glowPulse 3s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%,100% { opacity:.6; transform:scale(1); }
+  50%      { opacity:1; transform:scale(1.08); }
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 5.5vw, 4.8rem);
+  font-weight: 900; letter-spacing: -.03em; line-height: 1.05;
+  margin-bottom: 1.2rem;
+}
+.hero h1 .accent { color: var(--cyan); }
+.hero h1 .dim    { color: var(--muted); font-weight: 300; }
+.hero-sub {
+  font-size: 1.05rem; color: var(--subtle); max-width: 560px;
+  margin: 0 auto 2.5rem; line-height: 1.75;
+}
+.hero-actions { display: flex; gap: .8rem; flex-wrap: wrap; justify-content: center; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--f-mono); font-size: .72rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: .75rem 1.8rem;
+  background: var(--cyan); color: var(--bg); font-weight: 500;
+  text-decoration: none; border-radius: 5px; transition: all .2s;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(99,210,255,.3); }
+.btn-outline {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--f-mono); font-size: .72rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: .75rem 1.8rem;
+  border: 1px solid var(--border-g); color: var(--cyan);
+  text-decoration: none; border-radius: 5px; transition: all .2s;
+}
+.btn-outline:hover { background: var(--cyan-dim); transform: translateY(-1px); }
+
+/* status strip */
+.status-strip {
+  position: relative; z-index: 1;
+  display: flex; justify-content: center; gap: 0;
+  flex-wrap: wrap; margin: 0 2rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.status-item {
+  display: flex; align-items: center; gap: .7rem;
+  padding: 1rem 2rem;
+  border-right: 1px solid var(--border);
+}
+.status-item:last-child { border-right: none; }
+.s-dot { width:8px;height:8px;border-radius:50%; flex-shrink:0; }
+.s-green  { background:var(--green);  box-shadow:0 0 8px var(--green); }
+.s-cyan   { background:var(--cyan);   box-shadow:0 0 8px var(--cyan); }
+.s-amber  { background:var(--amber);  box-shadow:0 0 8px var(--amber); }
+.s-label  { font-family:var(--f-mono);font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted); }
+.s-value  { font-family:var(--f-mono);font-size:.72rem;font-weight:500;color:var(--text); }
+
+/* ══════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════ */
+.container { max-width:1100px; margin:0 auto; padding:0 2rem; position:relative;z-index:1; }
+
+section { padding: 5rem 0; }
+
+.section-tag {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--f-mono); font-size: .65rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--cyan);
+  margin-bottom: 1rem;
+}
+.section-tag::before { content:'▸'; }
+.section-title {
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  font-weight: 800; letter-spacing: -.025em; line-height: 1.1;
+  margin-bottom: 1rem;
+}
+.section-desc {
+  font-size: .92rem; color: var(--subtle); max-width: 540px; line-height: 1.75;
+}
+
+/* ══════════════════════════════════════════
+   WHAT I'M WORKING ON  (overview)
+══════════════════════════════════════════ */
+#overview { border-top: 1px solid var(--border); }
+
+.overview-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  background: var(--border); border: 1px solid var(--border);
+  margin-top: 3rem;
+}
+.overview-card {
+  background: var(--bg2); padding: 1.8rem;
+  transition: background .2s;
+}
+.overview-card:hover { background: var(--bg3); }
+.ov-head {
+  font-family: var(--f-mono); font-size: .6rem; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: .8rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.ov-head::after { content:''; flex:1; height:1px; background:var(--border); }
+.ov-body { font-size: .88rem; line-height: 1.8; color: var(--subtle); }
+.ov-body strong { color: var(--cyan); font-weight: 600; }
+
+/* ══════════════════════════════════════════
+   OBJECTIVES
+══════════════════════════════════════════ */
+#objectives { border-top: 1px solid var(--border); }
+
+.obj-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); margin-top: 3rem;
+}
+.obj-item {
+  background: var(--bg2); padding: 1.6rem;
+  display: flex; gap: 1rem; align-items: flex-start;
+  transition: background .2s;
+}
+.obj-item:hover { background: var(--bg3); }
+.obj-num {
+  font-family: var(--f-mono); font-size: .65rem; letter-spacing: .1em;
+  color: var(--cyan); background: var(--cyan-dim);
+  border: 1px solid rgba(99,210,255,.2);
+  padding: .25rem .55rem; border-radius: 3px; flex-shrink:0;
+  margin-top:.15rem;
+}
+.obj-item h3 { font-size:.92rem; font-weight:700; margin-bottom:.3rem; }
+.obj-item p  { font-size:.8rem; color:var(--subtle); line-height:1.65; }
+
+/* ══════════════════════════════════════════
+   HOW IT WORKS
+══════════════════════════════════════════ */
+#howitworks { border-top: 1px solid var(--border); }
+
+.flow-chain {
+  display: flex; flex-direction: column; gap: 0;
+  margin-top: 3rem;
+  border: 1px solid var(--border);
+}
+.flow-step {
+  display: grid; grid-template-columns: 60px 1fr auto;
+  align-items: center; gap: 1.5rem;
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  transition: background .2s;
+  position: relative; overflow: hidden;
+}
+.flow-step:last-child { border-bottom: none; }
+.flow-step::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--cyan); opacity: 0;
+  transition: opacity .2s;
+}
+.flow-step:hover { background: var(--bg3); }
+.flow-step:hover::before { opacity: 1; }
+.flow-n {
+  font-family: var(--f-mono); font-size: 1.4rem; font-weight: 700;
+  color: var(--border-g); text-align: right;
+}
+.flow-content h3 { font-size:.95rem; font-weight:700; margin-bottom:.25rem; }
+.flow-content p  { font-size:.82rem; color:var(--subtle); line-height:1.6; }
+.flow-tag {
+  font-family: var(--f-mono); font-size: .58rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: .2rem .55rem;
+  border-radius: 3px; white-space: nowrap;
+}
+.tag-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(67,233,123,.2); }
+.tag-cyan  { background: var(--cyan-dim);  color: var(--cyan);  border: 1px solid rgba(99,210,255,.2); }
+.tag-amber { background: rgba(255,200,67,.1); color: var(--amber); border: 1px solid rgba(255,200,67,.2); }
+.tag-red   { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,92,92,.2); }
+
+/* ══════════════════════════════════════════
+   BUTTON LOGIC
+══════════════════════════════════════════ */
+#buttons { border-top: 1px solid var(--border); }
+
+.btn-diagram {
+  margin-top: 3rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+}
+.btn-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 1.8rem; border-radius: 8px;
+  transition: border-color .2s, background .2s;
+}
+.btn-card:hover { border-color: var(--border-g); background: var(--bg3); }
+.btn-label {
+  display: flex; align-items: center; gap: .8rem; margin-bottom: 1.2rem;
+}
+.btn-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--cyan-dim); border: 2px solid var(--cyan);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-mono); font-size: .75rem; font-weight: 700;
+  color: var(--cyan); flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(99,210,255,.2);
+}
+.btn-label h3 { font-size:1rem; font-weight:700; }
+.btn-modes { display:flex; flex-direction:column; gap:.6rem; }
+.btn-mode {
+  display: flex; align-items: flex-start; gap: .7rem;
+  padding: .7rem; background: var(--card);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+.mode-chip {
+  font-family: var(--f-mono); font-size: .58rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: .18rem .5rem; border-radius:3px;
+  flex-shrink:0; margin-top:.15rem;
+}
+.chip-auto   { background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(99,210,255,.25);}
+.chip-manual { background:var(--green-dim);color:var(--green);border:1px solid rgba(67,233,123,.25);}
+.btn-mode p { font-size:.82rem; color:var(--subtle); line-height:1.55; }
+
+/* ══════════════════════════════════════════
+   COMPONENTS
+══════════════════════════════════════════ */
+#components { border-top: 1px solid var(--border); }
+
+.comp-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr));
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); margin-top:3rem;
+}
+.comp-card {
+  background: var(--bg2); padding: 1.4rem;
+  display:flex;flex-direction:column;gap:.5rem;
+  transition: background .2s;
+}
+.comp-card:hover { background: var(--bg3); }
+.comp-icon { font-size:1.6rem; }
+.comp-name { font-size:.88rem; font-weight:700; line-height:1.2; }
+.comp-role { font-family:var(--f-mono);font-size:.6rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted); }
+
+/* ══════════════════════════════════════════
+   CODE
+══════════════════════════════════════════ */
+#code { border-top: 1px solid var(--border); }
+
+.code-wrap {
+  margin-top: 3rem; border: 1px solid var(--border); overflow:hidden;
+}
+.code-topbar {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem 1rem; background:var(--bg3);
+  border-bottom:1px solid var(--border);
+}
+.code-dots { display:flex;gap:.4rem; }
+.cd { width:10px;height:10px;border-radius:50%; }
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename {
+  font-family:var(--f-mono);font-size:.65rem;letter-spacing:.06em;color:var(--muted);
+}
+.copy-code-btn {
+  font-family:var(--f-mono);font-size:.58rem;letter-spacing:.08em;
+  text-transform:uppercase;border:1px solid var(--border);background:none;
+  color:var(--muted);padding:.2rem .6rem;cursor:pointer;border-radius:3px;
+  transition:all .15s;
+}
+.copy-code-btn:hover{background:var(--cyan);color:var(--bg);border-color:var(--cyan);}
+.code-scroll { background:#090d14; padding:1.5rem; overflow-x:auto; max-height:480px; overflow-y:auto; }
+pre {
+  font-family:var(--f-mono);font-size:.73rem;line-height:1.9;
+  white-space:pre;color:#a8b8cc;
+}
+.ck  { color:#63d2ff; }          /* keyword */
+.cf  { color:#7ce38b; }          /* function */
+.cs  { color:#ff9b6b; }          /* string */
+.cc  { color:#4a5a6a; font-style:italic; } /* comment */
+.cn  { color:#c792ea; }          /* number */
+.ctype{ color:#ffd080; }         /* type/class */
+
+/* ══════════════════════════════════════════
+   SIMULATION LINK
+══════════════════════════════════════════ */
+#simulation { border-top: 1px solid var(--border); }
+
+.sim-card {
+  margin-top:3rem;
+  background: var(--bg2);
+  border: 1px solid var(--border-g);
+  padding: 2.5rem;
+  display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items:center;
+}
+.sim-card h3 { font-size:1.3rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.5rem; }
+.sim-card p  { font-size:.88rem;color:var(--subtle);line-height:1.7; }
+.sim-url {
+  font-family:var(--f-mono);font-size:.72rem;color:var(--cyan);
+  margin-top:.8rem;word-break:break-all;
+}
+.wokwi-badge {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.5rem;padding:1.5rem;background:var(--bg3);border:1px solid var(--border);
+  text-decoration:none;border-radius:6px;transition:border-color .2s,background .2s;
+  min-width:140px;text-align:center;
+}
+.wokwi-badge:hover { border-color:var(--border-g); background:var(--bg2); }
+.wokwi-icon { font-size:2.5rem; }
+.wokwi-label {
+  font-family:var(--f-mono);font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--cyan);
+}
+
+/* ══════════════════════════════════════════
+   TIMELINE
+══════════════════════════════════════════ */
+#timeline { border-top: 1px solid var(--border); }
+
+.timeline-track {
+  position: relative; margin-top: 3rem;
+  padding-left: 2rem;
+}
+.timeline-track::before {
+  content: '';
+  position: absolute; left: 7px; top: 6px; bottom: 6px; width: 1px;
+  background: linear-gradient(var(--cyan), rgba(99,210,255,0), rgba(99,210,255,0));
+  background: repeating-linear-gradient(var(--border) 0, var(--border) 6px, transparent 6px, transparent 12px);
+}
+.tl-entry {
+  position: relative; margin-bottom: 2.5rem;
+}
+.tl-entry:last-child { margin-bottom:0; }
+.tl-dot {
+  position: absolute; left: -2rem; top: 4px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bg3); border: 2px solid var(--cyan);
+  box-shadow: 0 0 12px rgba(99,210,255,.4);
+}
+.tl-month {
+  font-family:var(--f-mono);font-size:.62rem;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--cyan);margin-bottom:.4rem;
+}
+.tl-title { font-size:1.05rem;font-weight:700;margin-bottom:.5rem; }
+.tl-body  { font-size:.86rem;color:var(--subtle);line-height:1.75; }
+
+/* ══════════════════════════════════════════
+   FUTURE
+══════════════════════════════════════════ */
+#future { border-top: 1px solid var(--border); }
+
+.future-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+  gap: 1px; background:var(--border); border:1px solid var(--border);
+  margin-top:3rem;
+}
+.future-item {
+  background:var(--bg2); padding:1.5rem;
+  display:flex;align-items:flex-start;gap:.9rem;
+  transition:background .2s;
+}
+.future-item:hover { background:var(--bg3); }
+.fi-icon { font-size:1.3rem; flex-shrink:0; margin-top:.1rem; }
+.fi-body h4 { font-size:.9rem;font-weight:700;margin-bottom:.25rem; }
+.fi-body p  { font-size:.78rem;color:var(--subtle);line-height:1.6; }
+
+/* ══════════════════════════════════════════
+   APPLICATIONS
+══════════════════════════════════════════ */
+#applications { border-top: 1px solid var(--border); }
+
+.app-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
+  gap: 1rem; margin-top: 3rem;
+}
+.app-card {
+  background:var(--bg2);border:1px solid var(--border);
+  padding:1.5rem;border-radius:6px;text-align:center;
+  transition:border-color .2s,transform .2s;
+}
+.app-card:hover { border-color:var(--border-g); transform:translateY(-3px); }
+.app-emoji { font-size:2rem;display:block;margin-bottom:.7rem; }
+.app-card h4 { font-size:.88rem;font-weight:700;margin-bottom:.25rem; }
+.app-card p  { font-size:.75rem;color:var(--muted);line-height:1.55; }
+
+/* ══════════════════════════════════════════
+   CONCLUSION
+══════════════════════════════════════════ */
+#conclusion { border-top: 1px solid var(--border); }
+
+.conclusion-box {
+  margin-top:3rem;
+  background:linear-gradient(135deg, rgba(99,210,255,.05), rgba(67,233,123,.03));
+  border:1px solid var(--border-g);
+  padding:3rem; position:relative; overflow:hidden;
+}
+.conclusion-box::before {
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg, var(--cyan), var(--green), transparent);
+}
+.conclusion-box p {
+  font-size:1rem;line-height:1.85;color:var(--subtle);max-width:700px;
+}
+.conclusion-box p strong { color:var(--cyan); font-weight:600; }
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+footer {
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);
+  padding:2rem 2rem; text-align:center;
+  background:var(--bg2);
+}
+.footer-inner {
+  max-width:1100px;margin:0 auto;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:1rem;
+}
+.footer-brand { font-size:.85rem;font-weight:700;color:var(--text); }
+.footer-brand span { color:var(--cyan); }
+.footer-copy {
+  font-family:var(--f-mono);font-size:.6rem;letter-spacing:.08em;
+  color:var(--muted);
+}
+
+/* ══════════════════════════════════════════
+   REVEAL
+══════════════════════════════════════════ */
+.reveal {
+  opacity:0; transform:translateY(22px);
+  transition:opacity .55s ease, transform .55s ease;
+}
+.reveal.visible { opacity:1; transform:none; }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media(max-width:780px){
+  .nav-links{display:none;}
+  .overview-grid{grid-template-columns:1fr;}
+  .btn-diagram{grid-template-columns:1fr;}
+  .sim-card{grid-template-columns:1fr;}
+  .flow-step{grid-template-columns:40px 1fr;}
+  .flow-tag{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ORBS -->
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- ══════════════════════════
+     NAV
+══════════════════════════ -->
+<nav>
+  <div class="nav-brand">
+    <div class="lock-icon-sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#63d2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    Digital Lock System
+    <span class="nav-pill">Arduino Project</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#howitworks">How It Works</a></li>
+    <li><a href="#components">Components</a></li>
+    <li><a href="#code">Code</a></li>
+    <li><a href="#timeline">Timeline</a></li>
+  </ul>
+  <a href="https://wokwi.com/projects/435299888243742721" target="_blank" class="sim-btn">▶ Live Simulation</a>
+</nav>
+
+<!-- ══════════════════════════
+     HERO
+══════════════════════════ -->
+<section class="hero">
+  <div class="hero-eyebrow">Arduino · Embedded Systems · Security</div>
+
+  <div class="hero-lock">
+    <div class="lock-glow"></div>
+    <div class="lock-ring"></div>
+    <div class="lock-ring"></div>
+    <div class="lock-core">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#63d2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        <circle cx="12" cy="16" r="1.5" fill="#63d2ff" stroke="none"/>
+      </svg>
+    </div>
+  </div>
+
+  <h1>
+    Digital <span class="accent">Lock</span><br>
+    <span class="dim">System</span>
+  </h1>
+  <p class="hero-sub">
+    An Arduino-based password-protected door lock using a 4×4 keypad, 
+    LCD display, servo motor, and buzzer — with auto-lock, wrong-attempt 
+    lockout, and password change capability.
+  </p>
+  <div class="hero-actions">
+    <a href="https://wokwi.com/projects/435299888243742721" target="_blank" class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      View Simulation
+    </a>
+    <a href="#overview" class="btn-outline">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Read Docs
+    </a>
+  </div>
+</section>
+
+<!-- Status strip -->
+<div class="status-strip">
+  <div class="status-item">
+    <div class="s-dot s-green"></div>
+    <div><div class="s-label">Status</div><div class="s-value">Simulation Live</div></div>
+  </div>
+  <div class="status-item">
+    <div class="s-dot s-cyan"></div>
+    <div><div class="s-label">Platform</div><div class="s-value">Arduino UNO</div></div>
+  </div>
+  <div class="status-item">
+    <div class="s-dot s-amber"></div>
+    <div><div class="s-label">Password Length</div><div class="s-value">6 Digits</div></div>
+  </div>
+  <div class="status-item">
+    <div class="s-dot s-green"></div>
+    <div><div class="s-label">Max Attempts</div><div class="s-value">3 Before Lockout</div></div>
+  </div>
+  <div class="status-item">
+    <div class="s-dot s-cyan"></div>
+    <div><div class="s-label">Auto-Lock</div><div class="s-value">10 sec Delay</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     OVERVIEW
+══════════════════════════ -->
+<section id="overview">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">What I Am Working On</div>
+      <h2 class="section-title">Project Overview</h2>
+      <p class="section-desc">A smart digital lock system built on Arduino that combines security, simplicity, and automation into one compact embedded project.</p>
+    </div>
+    <div class="overview-grid reveal">
+      <div class="overview-card">
+        <div class="ov-head">The Idea</div>
+        <p class="ov-body">
+          I am building a <strong>password-protected digital lock</strong> using an Arduino UNO microcontroller. 
+          The system allows users to enter a 6-digit PIN via a <strong>4×4 matrix keypad</strong>. 
+          If the correct password is entered, a <strong>servo motor</strong> rotates to unlock the door 
+          and automatically re-locks after a countdown.
+        </p>
+      </div>
+      <div class="overview-card">
+        <div class="ov-head">Core Focus</div>
+        <p class="ov-body">
+          The main focus is on <strong>security and user feedback</strong>. 
+          A 16×2 LCD display provides real-time prompts and status messages. 
+          A <strong>buzzer</strong> gives audio feedback on key presses, successful access, 
+          and failed attempts. After <strong>3 wrong attempts</strong>, the system locks itself 
+          and triggers a lockout alert.
+        </p>
+      </div>
+      <div class="overview-card">
+        <div class="ov-head">Key Capability</div>
+        <p class="ov-body">
+          Users can also <strong>change the password</strong> at any time by entering the master PIN 
+          followed by a new 6-digit password, which is saved to <strong>EEPROM</strong> — so the 
+          custom password persists even after power loss. The default master password is <strong>123456</strong>.
+        </p>
+      </div>
+      <div class="overview-card">
+        <div class="ov-head">Simulation</div>
+        <p class="ov-body">
+          The complete working simulation is hosted on <strong>Wokwi</strong> — an online Arduino simulator 
+          — so the project can be tested, inspected, and demonstrated without any physical hardware. 
+          The simulation is <strong>always accessible</strong> via the link in this documentation.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     OBJECTIVES
+══════════════════════════ -->
+<section id="objectives">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Project Objectives</div>
+      <h2 class="section-title">What This Project Achieves</h2>
+    </div>
+    <div class="obj-list reveal">
+      <div class="obj-item">
+        <div class="obj-num">01</div>
+        <div>
+          <h3>Secure Password Entry</h3>
+          <p>Accept a 6-digit PIN via 4×4 keypad, masking input on the LCD with asterisks for privacy.</p>
+        </div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-num">02</div>
+        <div>
+          <h3>Physical Unlock Mechanism</h3>
+          <p>Drive a servo motor to physically lock and unlock the door latch on correct password entry.</p>
+        </div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-num">03</div>
+        <div>
+          <h3>Wrong Attempt Lockout</h3>
+          <p>Detect 3 consecutive wrong passwords, trigger buzzer alert, and lock the system temporarily.</p>
+        </div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-num">04</div>
+        <div>
+          <h3>Auto-Relock</h3>
+          <p>Automatically relock the door 10 seconds after unlocking — no manual lock action needed.</p>
+        </div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-num">05</div>
+        <div>
+          <h3>Password Change</h3>
+          <p>Allow the owner to update the PIN using a master key sequence, saved persistently in EEPROM.</p>
+        </div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-num">06</div>
+        <div>
+          <h3>Clear User Feedback</h3>
+          <p>Provide real-time LCD messages and buzzer tones for every system event and state change.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     HOW IT WORKS
+══════════════════════════ -->
+<section id="howitworks">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">How the System Works</div>
+      <h2 class="section-title">Step-by-Step Logic</h2>
+      <p class="section-desc">Every interaction follows a clear, deterministic flow — from keypress to physical lock actuation.</p>
+    </div>
+    <div class="flow-chain reveal">
+      <div class="flow-step">
+        <div class="flow-n">01</div>
+        <div class="flow-content">
+          <h3>System Boot</h3>
+          <p>Arduino initializes, servo locks the door, LCD displays project name for 3 seconds, then shows "Enter Password".</p>
+        </div>
+        <span class="flow-tag tag-cyan">Startup</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">02</div>
+        <div class="flow-content">
+          <h3>Password Input</h3>
+          <p>User presses keys on the 4×4 keypad. Each digit is masked as <code style="color:var(--cyan);font-family:var(--f-mono)">*</code> on the LCD. Buzzer beeps on each keypress for tactile feedback.</p>
+        </div>
+        <span class="flow-tag tag-amber">Input</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">03</div>
+        <div class="flow-content">
+          <h3>Submit with # Key</h3>
+          <p>Pressing <code style="color:var(--cyan);font-family:var(--f-mono)">#</code> submits the entered password. Arduino compares it against the stored master password in EEPROM.</p>
+        </div>
+        <span class="flow-tag tag-amber">Compare</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">04</div>
+        <div class="flow-content">
+          <h3>Correct Password → Unlock</h3>
+          <p>Green LED lights up. LCD shows "Access Granted". Servo rotates to 90° (open position). System begins 10-second countdown before auto-relocking.</p>
+        </div>
+        <span class="flow-tag tag-green">Unlock</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">05</div>
+        <div class="flow-content">
+          <h3>Wrong Password → Alert</h3>
+          <p>Red LED flashes. Buzzer sounds. LCD shows "Wrong Password". Attempt counter increments. After 3 failures, system enters lockout mode.</p>
+        </div>
+        <span class="flow-tag tag-red">Error</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">06</div>
+        <div class="flow-content">
+          <h3>Auto-Relock</h3>
+          <p>After 10 seconds in the unlocked state, the servo returns to 0° (locked). LCD returns to "Enter Password" prompt. System is ready for the next entry.</p>
+        </div>
+        <span class="flow-tag tag-cyan">Auto</span>
+      </div>
+      <div class="flow-step">
+        <div class="flow-n">07</div>
+        <div class="flow-content">
+          <h3>Manual Lock with * Key</h3>
+          <p>Pressing <code style="color:var(--cyan);font-family:var(--f-mono)">*</code> manually locks the door at any time. LCD shows "Door Locked". Servo returns to locked position immediately.</p>
+        </div>
+        <span class="flow-tag tag-cyan">Manual</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     BUTTON LOGIC
+══════════════════════════ -->
+<section id="buttons">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Keypad Control Logic</div>
+      <h2 class="section-title">Key Mapping</h2>
+      <p class="section-desc">The 4×4 keypad uses two special keys as action triggers, mirroring the two-button simplicity of the reference design.</p>
+    </div>
+    <div class="btn-diagram reveal">
+      <div class="btn-card">
+        <div class="btn-label">
+          <div class="btn-circle">#</div>
+          <div>
+            <h3>Hash Key — Submit / Confirm</h3>
+          </div>
+        </div>
+        <div class="btn-modes">
+          <div class="btn-mode">
+            <span class="mode-chip chip-auto">Enter Password</span>
+            <p>Submits the entered digits as the password attempt. Triggers comparison and either unlocks or increments the wrong-attempt counter.</p>
+          </div>
+          <div class="btn-mode">
+            <span class="mode-chip chip-manual">Change Password</span>
+            <p>After entering the master PIN, pressing # confirms and saves the newly entered 6-digit password to EEPROM permanently.</p>
+          </div>
+        </div>
+      </div>
+      <div class="btn-card">
+        <div class="btn-label">
+          <div class="btn-circle" style="border-color:var(--green);color:var(--green);background:var(--green-dim);box-shadow:0 0 16px rgba(67,233,123,.2);">*</div>
+          <div>
+            <h3>Star Key — Lock / Clear</h3>
+          </div>
+        </div>
+        <div class="btn-modes">
+          <div class="btn-mode">
+            <span class="mode-chip chip-manual">Locked State</span>
+            <p>Manually locks the door immediately by returning the servo to 0°. Useful when leaving before the 10-second auto-relock timer expires.</p>
+          </div>
+          <div class="btn-mode">
+            <span class="mode-chip chip-auto">Input State</span>
+            <p>Clears the current input buffer and resets the digit count to zero, allowing the user to re-enter the password from scratch.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     COMPONENTS
+══════════════════════════ -->
+<section id="components">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Components Used</div>
+      <h2 class="section-title">Hardware List</h2>
+    </div>
+    <div class="comp-grid reveal">
+      <div class="comp-card">
+        <div class="comp-icon">🧠</div>
+        <div class="comp-name">Arduino UNO</div>
+        <div class="comp-role">Main Controller</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">⌨️</div>
+        <div class="comp-name">4×4 Matrix Keypad</div>
+        <div class="comp-role">Password Input</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🖥️</div>
+        <div class="comp-name">16×2 LCD Display</div>
+        <div class="comp-role">Status / Feedback</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">⚙️</div>
+        <div class="comp-name">SG90 Servo Motor</div>
+        <div class="comp-role">Lock Mechanism</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🔔</div>
+        <div class="comp-name">Buzzer</div>
+        <div class="comp-role">Audio Alerts</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🟢</div>
+        <div class="comp-name">Green LED</div>
+        <div class="comp-role">Access Granted</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🔴</div>
+        <div class="comp-name">Red LED</div>
+        <div class="comp-role">Access Denied</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">🔌</div>
+        <div class="comp-name">I²C Module (PCF8574)</div>
+        <div class="comp-role">LCD Interface</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">💾</div>
+        <div class="comp-name">EEPROM (onboard)</div>
+        <div class="comp-role">Password Storage</div>
+      </div>
+      <div class="comp-card">
+        <div class="comp-icon">⬛</div>
+        <div class="comp-name">Resistors (220Ω)</div>
+        <div class="comp-role">LED Current Limit</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     CODE
+══════════════════════════ -->
+<section id="code">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Arduino Code</div>
+      <h2 class="section-title">Core Sketch</h2>
+      <p class="section-desc">The complete Arduino sketch — password comparison, servo control, EEPROM storage, and LCD feedback all in one file.</p>
+    </div>
+    <div class="code-wrap reveal">
+      <div class="code-topbar">
+        <div class="code-dots"><div class="cd cd-r"></div><div class="cd cd-y"></div><div class="cd cd-g"></div></div>
+        <span class="code-filename">digital_lock.ino</span>
+        <button class="copy-code-btn" onclick="copyCode()">Copy</button>
+      </div>
+      <div class="code-scroll">
+        <pre id="codeBlock"
+><span class="cc">// ─────────────────────────────────────────────
+//  Digital Lock System — Arduino UNO
+//  Components: 4x4 Keypad, 16x2 LCD (I2C),
+//              SG90 Servo, Buzzer, 2x LEDs
+// ─────────────────────────────────────────────</span>
+
+<span class="ck">#include</span> <span class="cs">&lt;Keypad.h&gt;</span>
+<span class="ck">#include</span> <span class="cs">&lt;LiquidCrystal_I2C.h&gt;</span>
+<span class="ck">#include</span> <span class="cs">&lt;Servo.h&gt;</span>
+<span class="ck">#include</span> <span class="cs">&lt;EEPROM.h&gt;</span>
+
+<span class="cc">// ── PIN DEFINITIONS ──────────────────────────</span>
+<span class="ck">#define</span> <span class="cf">SERVO_PIN</span>    <span class="cn">9</span>
+<span class="ck">#define</span> <span class="cf">BUZZER_PIN</span>  <span class="cn">8</span>
+<span class="ck">#define</span> <span class="cf">LED_GREEN</span>   <span class="cn">7</span>
+<span class="ck">#define</span> <span class="cf">LED_RED</span>     <span class="cn">6</span>
+<span class="ck">#define</span> <span class="cf">PASS_LEN</span>    <span class="cn">6</span>
+
+<span class="cc">// ── KEYPAD LAYOUT ────────────────────────────</span>
+<span class="ck">const byte</span> ROWS = <span class="cn">4</span>, COLS = <span class="cn">4</span>;
+<span class="ck">char</span> keys[ROWS][COLS] = {
+  {<span class="cs">'1'</span>,<span class="cs">'2'</span>,<span class="cs">'3'</span>,<span class="cs">'A'</span>},
+  {<span class="cs">'4'</span>,<span class="cs">'5'</span>,<span class="cs">'6'</span>,<span class="cs">'B'</span>},
+  {<span class="cs">'7'</span>,<span class="cs">'8'</span>,<span class="cs">'9'</span>,<span class="cs">'C'</span>},
+  {<span class="cs">'*'</span>,<span class="cs">'0'</span>,<span class="cs">'#'</span>,<span class="cs">'D'</span>}
+};
+<span class="ck">byte</span> rowPins[ROWS] = {<span class="cn">A0</span>,<span class="cn">A1</span>,<span class="cn">A2</span>,<span class="cn">A3</span>};
+<span class="ck">byte</span> colPins[COLS] = {<span class="cn">A4</span>,<span class="cn">A5</span>,<span class="cn">2</span>,<span class="cn">3</span>};
+
+<span class="ctype">Keypad</span>            keypad  = <span class="cf">Keypad</span>(<span class="cf">makeKeymap</span>(keys), rowPins, colPins, ROWS, COLS);
+<span class="ctype">LiquidCrystal_I2C</span> lcd     = <span class="cf">LiquidCrystal_I2C</span>(<span class="cn">0x27</span>, <span class="cn">16</span>, <span class="cn">2</span>);
+<span class="ctype">Servo</span>             servo;
+
+<span class="cc">// ── STATE ─────────────────────────────────────</span>
+<span class="ck">char</span>  enteredPass[PASS_LEN + <span class="cn">1</span>];
+<span class="ck">char</span>  storedPass[PASS_LEN + <span class="cn">1</span>];
+<span class="ck">byte</span>  digitCount   = <span class="cn">0</span>;
+<span class="ck">byte</span>  wrongAttempts = <span class="cn">0</span>;
+<span class="ck">bool</span>  isLocked     = <span class="ck">true</span>;
+
+<span class="cc">// ── SETUP ─────────────────────────────────────</span>
+<span class="ck">void</span> <span class="cf">setup</span>() {
+  lcd.<span class="cf">init</span>(); lcd.<span class="cf">backlight</span>();
+  servo.<span class="cf">attach</span>(SERVO_PIN);
+  <span class="cf">pinMode</span>(BUZZER_PIN, OUTPUT);
+  <span class="cf">pinMode</span>(LED_GREEN, OUTPUT);
+  <span class="cf">pinMode</span>(LED_RED, OUTPUT);
+
+  <span class="cc">// Load password from EEPROM (or set default)</span>
+  <span class="ck">for</span> (<span class="ck">byte</span> i = <span class="cn">0</span>; i &lt; PASS_LEN; i++) {
+    storedPass[i] = EEPROM.<span class="cf">read</span>(i);
+    <span class="ck">if</span> (storedPass[i] &lt; <span class="cs">'0'</span> || storedPass[i] &gt; <span class="cs">'9'</span>)
+      storedPass[i] = (<span class="ck">char</span>)(i + <span class="cn">49</span>); <span class="cc">// default: 123456</span>
+  }
+  storedPass[PASS_LEN] = <span class="cn">'\0'</span>;
+
+  <span class="cf">lockDoor</span>();
+  lcd.<span class="cf">print</span>(<span class="cs">"  Arduino Lock  "</span>);
+  lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">1</span>);
+  lcd.<span class="cf">print</span>(<span class="cs">"  Project v1.0  "</span>);
+  <span class="cf">delay</span>(<span class="cn">2500</span>);
+  <span class="cf">promptPassword</span>();
+}
+
+<span class="cc">// ── MAIN LOOP ─────────────────────────────────</span>
+<span class="ck">void</span> <span class="cf">loop</span>() {
+  <span class="ck">char</span> key = keypad.<span class="cf">getKey</span>();
+  <span class="ck">if</span> (!key) <span class="ck">return</span>;
+
+  <span class="cf">tone</span>(BUZZER_PIN, <span class="cn">1200</span>, <span class="cn">60</span>);
+
+  <span class="ck">if</span> (key == <span class="cs">'*'</span>) {          <span class="cc">// Clear / manual lock</span>
+    digitCount = <span class="cn">0</span>;
+    <span class="ck">if</span> (!isLocked) <span class="cf">lockDoor</span>();
+    <span class="cf">promptPassword</span>();
+    <span class="ck">return</span>;
+  }
+
+  <span class="ck">if</span> (key == <span class="cs">'#'</span>) {          <span class="cc">// Submit</span>
+    enteredPass[digitCount] = <span class="cn">'\0'</span>;
+    <span class="cf">checkPassword</span>();
+    <span class="ck">return</span>;
+  }
+
+  <span class="ck">if</span> (digitCount &lt; PASS_LEN) {
+    enteredPass[digitCount++] = key;
+    lcd.<span class="cf">setCursor</span>(digitCount - <span class="cn">1</span>, <span class="cn">1</span>);
+    lcd.<span class="cf">print</span>(<span class="cs">'*'</span>);
+  }
+}
+
+<span class="cc">// ── HELPERS ───────────────────────────────────</span>
+<span class="ck">void</span> <span class="cf">checkPassword</span>() {
+  <span class="ck">if</span> (<span class="cf">strcmp</span>(enteredPass, storedPass) == <span class="cn">0</span>) {
+    wrongAttempts = <span class="cn">0</span>;
+    <span class="cf">grantAccess</span>();
+  } <span class="ck">else</span> {
+    wrongAttempts++;
+    <span class="ck">if</span> (wrongAttempts &gt;= <span class="cn">3</span>) <span class="cf">lockout</span>();
+    <span class="ck">else</span> <span class="cf">denyAccess</span>();
+  }
+  digitCount = <span class="cn">0</span>;
+}
+
+<span class="ck">void</span> <span class="cf">grantAccess</span>() {
+  <span class="cf">digitalWrite</span>(LED_GREEN, HIGH);
+  lcd.<span class="cf">clear</span>(); lcd.<span class="cf">print</span>(<span class="cs">"Access Granted!"</span>);
+  lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">1</span>); lcd.<span class="cf">print</span>(<span class="cs">"Door Open"</span>);
+  servo.<span class="cf">write</span>(<span class="cn">90</span>); isLocked = <span class="ck">false</span>;
+  <span class="cf">delay</span>(<span class="cn">10000</span>); <span class="cc">// 10-sec auto relock</span>
+  <span class="cf">lockDoor</span>(); <span class="cf">promptPassword</span>();
+  <span class="cf">digitalWrite</span>(LED_GREEN, LOW);
+}
+
+<span class="ck">void</span> <span class="cf">denyAccess</span>() {
+  <span class="cf">digitalWrite</span>(LED_RED, HIGH);
+  lcd.<span class="cf">clear</span>(); lcd.<span class="cf">print</span>(<span class="cs">"Wrong Password!"</span>);
+  lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">1</span>); lcd.<span class="cf">print</span>(<span class="cs">"Attempts: "</span>); lcd.<span class="cf">print</span>(wrongAttempts);
+  <span class="cf">tone</span>(BUZZER_PIN, <span class="cn">300</span>, <span class="cn">800</span>);
+  <span class="cf">delay</span>(<span class="cn">2000</span>); <span class="cf">digitalWrite</span>(LED_RED, LOW);
+  <span class="cf">promptPassword</span>();
+}
+
+<span class="ck">void</span> <span class="cf">lockout</span>() {
+  lcd.<span class="cf">clear</span>(); lcd.<span class="cf">print</span>(<span class="cs">"!! LOCKED OUT !!"</span>);
+  <span class="ck">for</span> (<span class="ck">int</span> i = <span class="cn">0</span>; i &lt; <span class="cn">5</span>; i++) {
+    <span class="cf">tone</span>(BUZZER_PIN, <span class="cn">200</span>, <span class="cn">400</span>); <span class="cf">delay</span>(<span class="cn">500</span>);
+  }
+  wrongAttempts = <span class="cn">0</span>; <span class="cf">promptPassword</span>();
+}
+
+<span class="ck">void</span> <span class="cf">lockDoor</span>() {
+  servo.<span class="cf">write</span>(<span class="cn">0</span>); isLocked = <span class="ck">true</span>;
+}
+
+<span class="ck">void</span> <span class="cf">promptPassword</span>() {
+  lcd.<span class="cf">clear</span>(); lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">0</span>);
+  lcd.<span class="cf">print</span>(<span class="cs">"Enter Password:"</span>);
+  lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">1</span>); lcd.<span class="cf">print</span>(<span class="cs">"                "</span>);
+  lcd.<span class="cf">setCursor</span>(<span class="cn">0</span>, <span class="cn">1</span>);
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     SIMULATION
+══════════════════════════ -->
+<section id="simulation">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Live Simulation</div>
+      <h2 class="section-title">Try It on Wokwi</h2>
+    </div>
+    <div class="sim-card reveal">
+      <div>
+        <h3>Complete Working Simulation</h3>
+        <p>The full digital lock system is simulated on <strong style="color:var(--cyan)">Wokwi</strong> — an online Arduino simulator. Open it to interact with the keypad, see the LCD respond, watch the servo move, and test the lockout mechanism — all in your browser, no hardware needed.</p>
+        <div class="sim-url">🔗 https://wokwi.com/projects/435299888243742721</div>
+      </div>
+      <a href="https://wokwi.com/projects/435299888243742721" target="_blank" class="wokwi-badge">
+        <span class="wokwi-icon">▶</span>
+        <span class="wokwi-label">Open Simulation</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     TIMELINE
+══════════════════════════ -->
+<section id="timeline">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Development Timeline</div>
+      <h2 class="section-title">Feb – Jun 2026</h2>
+    </div>
+    <div class="timeline-track reveal">
+      <div class="tl-entry">
+        <div class="tl-dot"></div>
+        <div class="tl-month">February 2026 — Initial Development</div>
+        <div class="tl-title">Keypad & LCD Foundation</div>
+        <div class="tl-body">
+          Set up the 4×4 keypad matrix interface using the Keypad library. Configured the I²C LCD display and wrote the basic password-entry loop. Validated character reading and display masking with asterisks. Established the core input → compare → respond logic.
+        </div>
+      </div>
+      <div class="tl-entry">
+        <div class="tl-dot"></div>
+        <div class="tl-month">April 2026 — Security & Actuator</div>
+        <div class="tl-title">Servo Control & Wrong-Attempt Lockout</div>
+        <div class="tl-body">
+          Integrated the SG90 servo motor for physical lock/unlock actuation. Added the wrong-attempt counter and 3-strike lockout with buzzer alert. Implemented the auto-relock timer (10 seconds). Added the manual lock via the * key. Tested all state transitions in simulation.
+        </div>
+      </div>
+      <div class="tl-entry">
+        <div class="tl-dot"></div>
+        <div class="tl-month">June 2026 — EEPROM & Finalization</div>
+        <div class="tl-title">Persistent Storage, LED Feedback & Documentation</div>
+        <div class="tl-body">
+          Added EEPROM read/write for persistent password storage across power cycles. Integrated red/green LEDs as visual indicators. Polished all LCD messages and timing. Built the Wokwi simulation, wrote full project documentation, and prepared the GitHub Pages site for submission.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     FUTURE
+══════════════════════════ -->
+<section id="future">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Future Improvements</div>
+      <h2 class="section-title">What Comes Next</h2>
+    </div>
+    <div class="future-list reveal">
+      <div class="future-item">
+        <span class="fi-icon">📱</span>
+        <div class="fi-body">
+          <h4>Bluetooth / Wi-Fi Control</h4>
+          <p>Add HC-05 Bluetooth or ESP8266 Wi-Fi module to unlock the door remotely from a smartphone app.</p>
+        </div>
+      </div>
+      <div class="future-item">
+        <span class="fi-icon">☁️</span>
+        <div class="fi-body">
+          <h4>Web Dashboard</h4>
+          <p>Build a mobile-friendly web interface to view lock history, change password, and get access notifications.</p>
+        </div>
+      </div>
+      <div class="future-item">
+        <span class="fi-icon">👆</span>
+        <div class="fi-body">
+          <h4>Fingerprint Sensor</h4>
+          <p>Integrate an R307 fingerprint module for biometric authentication as an alternative to the PIN keypad.</p>
+        </div>
+      </div>
+      <div class="future-item">
+        <span class="fi-icon">📡</span>
+        <div class="fi-body">
+          <h4>RFID Card Support</h4>
+          <p>Add an MFRC522 RFID reader so the door can be unlocked with an authorized card or key fob.</p>
+        </div>
+      </div>
+      <div class="future-item">
+        <span class="fi-icon">🔋</span>
+        <div class="fi-body">
+          <h4>Backup Power</h4>
+          <p>Add a LiPo battery with charging circuit so the lock continues to function during a power outage.</p>
+        </div>
+      </div>
+      <div class="future-item">
+        <span class="fi-icon">📦</span>
+        <div class="fi-body">
+          <h4>PCB & Enclosure</h4>
+          <p>Design a custom PCB and 3D-printed enclosure for real-world hardware deployment on an actual door.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     APPLICATIONS
+══════════════════════════ -->
+<section id="applications">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Applications</div>
+      <h2 class="section-title">Where It Can Be Used</h2>
+    </div>
+    <div class="app-grid reveal">
+      <div class="app-card">
+        <span class="app-emoji">🏠</span>
+        <h4>Home Security</h4>
+        <p>Secure bedroom, study, or storage room doors without traditional keys.</p>
+      </div>
+      <div class="app-card">
+        <span class="app-emoji">🏢</span>
+        <h4>Office Rooms</h4>
+        <p>Control access to server rooms, laboratories, or private offices.</p>
+      </div>
+      <div class="app-card">
+        <span class="app-emoji">🏦</span>
+        <h4>Lockers & Safes</h4>
+        <p>Retrofit onto cabinets or lockers for PIN-protected access.</p>
+      </div>
+      <div class="app-card">
+        <span class="app-emoji">🎓</span>
+        <h4>Education</h4>
+        <p>Demonstrate embedded systems, I/O, and security concepts in classrooms.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════
+     CONCLUSION
+══════════════════════════ -->
+<section id="conclusion">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-tag">Conclusion</div>
+      <h2 class="section-title">Project Summary</h2>
+    </div>
+    <div class="conclusion-box reveal">
+      <p>
+        This project demonstrates a complete, working <strong>digital lock system</strong> using an Arduino UNO and readily available components. Starting from basic keypad interfacing, the system evolved into a full-featured security device with <strong>auto-locking</strong>, a <strong>3-strike lockout</strong>, <strong>EEPROM-persistent password storage</strong>, visual and audio feedback, and a <strong>live Wokwi simulation</strong> for demonstration without physical hardware. The structured development timeline — from raw I/O testing in February to polished documentation in June — reflects a professional approach to embedded systems design. The project is well-positioned for real-world deployment and future expansion with Wi-Fi, biometrics, or RFID access.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span>Digital Lock</span> System · Arduino UNO Project
+    </div>
+    <div class="footer-copy">© 2025 · Project Documentation · MIT License</div>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+document.querySelectorAll('.reveal').forEach(el => {
+  new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.06 }).observe(el);
+});
+
+// Copy code
+function copyCode() {
+  const code = document.getElementById('codeBlock').innerText;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.querySelector('.copy-code-btn');
+    btn.textContent = '✓ Copied';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+// Animate lock icon on scroll into view
+const lockCore = document.querySelector('.lock-core');
+let unlocked = false;
+setInterval(() => {
+  unlocked = !unlocked;
+  const path = lockCore.querySelector('path');
+  if (path) {
+    path.setAttribute('d', unlocked
+      ? 'M7 11V7a5 5 0 0 1 9.9-1'   // slightly open
+      : 'M7 11V7a5 5 0 0 1 10 0v4' // locked
+    );
+  }
+}, 3500);
+</script>
+</body>
+</html>
